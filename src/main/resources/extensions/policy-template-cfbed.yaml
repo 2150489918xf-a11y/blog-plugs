@@ -1,0 +1,70 @@
+apiVersion: storage.halo.run/v1alpha1
+kind: PolicyTemplate
+metadata:
+  name: cfbed
+spec:
+  displayName: CloudFlare ImgBed
+  settingName: cfbed-policy-template-setting
+---
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: cfbed-policy-template-setting
+spec:
+  forms:
+    - group: default
+      label: 基本配置
+      formSchema:
+        - $formkit: text
+          name: baseUrl
+          label: 图床地址
+          placeholder: https://imgbed.example.com
+          validation: required
+          help: 不要填写 /api 后缀，插件会自动请求 /upload。
+        - $formkit: password
+          name: token
+          label: API Token
+          validation: required
+        - $formkit: text
+          name: uploadChannel
+          label: 上传渠道
+          value: cfr2
+        - $formkit: text
+          name: uploadFolder
+          label: 上传目录
+          value: halo
+        - $formkit: select
+          name: returnFormat
+          label: 返回格式
+          value: full
+          options:
+            - label: 完整链接
+              value: full
+            - label: 相对路径
+              value: default
+          validation: required
+        - $formkit: text
+          name: publicUrl
+          label: 公开访问地址
+          placeholder: https://imgbed.example.com
+        - $formkit: select
+          name: deleteRemote
+          label: 删除附件时同步删除远端文件
+          value: false
+          options:
+            - label: 否
+              value: false
+            - label: 是
+              value: true
+        - $formkit: number
+          name: connectTimeoutSeconds
+          label: 连接超时秒数
+          value: 15
+          min: 1
+          max: 120
+        - $formkit: number
+          name: requestTimeoutSeconds
+          label: 请求超时秒数
+          value: 120
+          min: 5
+          max: 600

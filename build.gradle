@@ -1,0 +1,39 @@
+plugins {
+    id 'java'
+    id "run.halo.plugin.devtools" version "0.6.0"
+}
+
+group 'me.xiongfan.halo.cfbed'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://repo.spring.io/milestone' }
+}
+
+dependencies {
+    implementation platform('run.halo.tools.platform:plugin:2.22.0-alpha.1')
+    compileOnly 'run.halo.app:api'
+
+    testImplementation 'run.halo.app:api'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+test {
+    useJUnitPlatform()
+}
+
+halo {
+    version = '2.24'
+}

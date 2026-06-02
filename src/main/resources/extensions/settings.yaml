@@ -1,0 +1,90 @@
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: cfbed-settings
+spec:
+  forms:
+    - group: default
+      label: CFBed 图床
+      formSchema:
+        - $formkit: text
+          name: baseUrl
+          label: 图床地址
+          value: https://imgbed.xiongfan.me
+          validation: required
+          help: 不要填写 /api 后缀，插件会自动请求 /upload。
+        - $formkit: password
+          name: token
+          label: API Token
+          validation: required
+        - $formkit: text
+          name: uploadChannel
+          label: 上传渠道
+          value: cfr2
+          help: 对应 CloudFlare ImgBed 的 uploadChannel 参数，例如 cfr2、s3、telegram、webdav。
+        - $formkit: text
+          name: uploadFolder
+          label: 上传目录
+          value: halo
+        - $formkit: select
+          name: returnFormat
+          label: 返回格式
+          value: full
+          options:
+            - label: 完整链接
+              value: full
+            - label: 相对路径
+              value: default
+          validation: required
+        - $formkit: text
+          name: publicUrl
+          label: 公开访问地址
+          value: https://imgbed.xiongfan.me
+          help: 当返回格式为相对路径时用于拼接完整 URL；留空则使用图床地址。
+        - $formkit: select
+          name: deleteRemote
+          label: 删除附件时同步删除远端文件
+          value: false
+          options:
+            - label: 否
+              value: false
+            - label: 是
+              value: true
+        - $formkit: text
+          name: policyName
+          label: 自动维护的存储策略名称
+          value: cfbed-policy
+          validation: required
+        - $formkit: text
+          name: policyDisplayName
+          label: 存储策略显示名称
+          value: CloudFlare ImgBed
+          validation: required
+        - $formkit: checkbox
+          name: syncPolicy
+          label: 自动创建/同步存储策略
+          value: true
+        - $formkit: checkbox
+          name: setAsDefaultConsolePolicy
+          label: 设为管理端/文章编辑器默认上传策略
+          value: true
+        - $formkit: checkbox
+          name: setAsDefaultUcPolicy
+          label: 设为个人中心默认上传策略
+          value: false
+        - $formkit: checkbox
+          name: setAsDefaultAvatarPolicy
+          label: 设为头像默认上传策略
+          value: false
+        - $formkit: number
+          name: connectTimeoutSeconds
+          label: 连接超时秒数
+          value: 15
+          min: 1
+          max: 120
+        - $formkit: number
+          name: requestTimeoutSeconds
+          label: 请求超时秒数
+          value: 120
+          min: 5
+          max: 600

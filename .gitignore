@@ -1,0 +1,10 @@
+.gradle/
+build/
+workplace/
+
+*.iml
+.idea/
+.vscode/
+
+*.log
+*.tmp

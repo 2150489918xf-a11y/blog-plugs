@@ -1,0 +1,20 @@
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: PluginCfbedStorage
+spec:
+  enabled: true
+  requires: ">=2.22.0"
+  author:
+    name: xiongfan
+    website: https://xiongfan.me
+  settingName: cfbed-settings
+  configMapName: cfbed-config
+  homepage: https://github.com/2150489918xf-a11y/blog-plugs
+  repo: https://github.com/2150489918xf-a11y/blog-plugs
+  issues: https://github.com/2150489918xf-a11y/blog-plugs/issues
+  displayName: "CloudFlare ImgBed Storage"
+  version: "0.2.0-SNAPSHOT"
+  description: "Adds a Halo attachment storage policy backed by the CloudFlare ImgBed upload API."
+  license:
+    - name: "MIT"
