@@ -11,5 +11,6 @@ The blog theme is based on [L33Z22L11/blog-v3](https://github.com/L33Z22L11/blog
 ## Plugins
 
 - [halo-plugin-cfbed-storage](./halo-plugin-cfbed-storage): Halo attachment storage plugin for [MarSeventh/CloudFlare-ImgBed](https://github.com/MarSeventh/CloudFlare-ImgBed).
+- [photo-story-linker](./photo-story-linker): Halo plugin that binds gallery photos to story posts and enhances gallery previews.
 
 Each plugin is kept in its own directory so this repository can hold more blog-related plugins later.

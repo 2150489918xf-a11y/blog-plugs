@@ -1,0 +1,31 @@
+apiVersion: v1alpha1
+kind: Role
+metadata:
+  name: role-template-photo-story-linker-anonymous
+  labels:
+    halo.run/role-template: "true"
+    halo.run/hidden: "true"
+    rbac.authorization.halo.run/aggregate-to-anonymous: "true"
+rules:
+  - apiGroups: [ "api.photo-story-linker.xiongfan.me" ]
+    resources: [ "bindings", "assets" ]
+    verbs: [ "get", "list" ]
+---
+apiVersion: v1alpha1
+kind: Role
+metadata:
+  name: role-template-photo-story-linker-manage
+  labels:
+    halo.run/role-template: "true"
+  annotations:
+    rbac.authorization.halo.run/module: "Photo Story Linker"
+    rbac.authorization.halo.run/display-name: "Manage photo stories"
+    rbac.authorization.halo.run/ui-permissions: "[\"plugin:photo-story-linker:manage\"]"
+    rbac.authorization.halo.run/dependencies: "[\"role-template-view-posts\", \"role-template-photos-view\"]"
+rules:
+  - apiGroups: [ "photo-story-linker.xiongfan.me" ]
+    resources: [ "photostorybindings" ]
+    verbs: [ "*" ]
+  - apiGroups: [ "content.halo.run", "core.halo.run", "api.console.halo.run", "console.api.photo.halo.run" ]
+    resources: [ "posts", "photos", "photogroups" ]
+    verbs: [ "get", "list" ]

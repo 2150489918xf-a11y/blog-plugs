@@ -1,0 +1,19 @@
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: photo-story-linker
+spec:
+  enabled: true
+  requires: ">=2.24.0"
+  author:
+    name: xiongfan
+    website: https://xiongfan.me
+  logo: logo.png
+  homepage: https://github.com/2150489918xf-a11y/photo-story-linker#readme
+  repo: https://github.com/2150489918xf-a11y/photo-story-linker
+  issues: https://github.com/2150489918xf-a11y/photo-story-linker/issues
+  displayName: "Photo Story Linker"
+  description: "Bind Halo Photos to story posts and enhance gallery previews."
+  license:
+    - name: "GPL-3.0"
+      url: "https://github.com/2150489918xf-a11y/photo-story-linker/blob/main/LICENSE"
