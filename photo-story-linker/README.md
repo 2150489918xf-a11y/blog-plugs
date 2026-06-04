@@ -6,7 +6,11 @@ A Halo plugin that binds gallery photos to story posts and enhances the public p
 
 - Bind one photo to one Halo post.
 - Bind multiple photos to the same story post.
+- Create a Halo post draft from a selected photo and bind it automatically.
+- Manage bindings from a dedicated Console workspace.
+- Enable, disable, or remove bindings without deleting photos or posts.
 - Show public story links on the gallery page.
+- Merge the story preview with the gallery hover layer instead of stacking duplicate overlays.
 - Keep story content in Halo's native post system.
 - Preserve photos and posts when the plugin is disabled.
 
