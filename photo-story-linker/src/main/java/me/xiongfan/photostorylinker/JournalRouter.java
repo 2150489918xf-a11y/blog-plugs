@@ -16,6 +16,7 @@ import run.halo.app.extension.MetadataOperator;
 import run.halo.app.extension.ReactiveExtensionClient;
 
 import static org.springframework.web.reactive.function.server.RequestPredicates.GET;
+import static org.springframework.web.reactive.function.server.RequestPredicates.HEAD;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
 @Component
@@ -29,7 +30,8 @@ public class JournalRouter {
 
     @Bean
     RouterFunction<ServerResponse> journalRouterFunction() {
-        return route(GET("/journals"), this::journals);
+        return route(GET("/journals"), this::journals)
+            .andRoute(HEAD("/journals"), this::journals);
     }
 
     private Mono<ServerResponse> journals(ServerRequest request) {
