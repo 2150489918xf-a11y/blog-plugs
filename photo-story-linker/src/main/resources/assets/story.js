@@ -70,12 +70,12 @@
             <h3 class="photo-story-title">${escapeHtml(title)}</h3>
             ${description ? `<p class="photo-story-native">${escapeHtml(description)}</p>` : ""}
             <div class="photo-story-divider"></div>
-            <p class="photo-story-kicker">关联故事</p>
+            <p class="photo-story-kicker">关联日记</p>
             <h4 class="photo-story-post">${escapeHtml(binding.title)}</h4>
             ${storyTeaser ? `<p class="photo-story-teaser">${escapeHtml(storyTeaser)}</p>` : ""}
           </div>
           <a class="photo-story-button" href="${escapeHtml(binding.postUrl)}"${target}>${escapeHtml(
-        binding.badgeText || "阅读故事"
+        binding.badgeText || "阅读日记"
       )}</a>
         </div>
       `;

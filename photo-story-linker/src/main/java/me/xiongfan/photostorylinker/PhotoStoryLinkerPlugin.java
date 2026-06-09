@@ -18,10 +18,12 @@ public class PhotoStoryLinkerPlugin extends BasePlugin {
     @Override
     public void start() {
         schemeManager.register(PhotoStoryBinding.class);
+        schemeManager.register(JournalEntry.class);
     }
 
     @Override
     public void stop() {
+        schemeManager.unregister(schemeManager.get(JournalEntry.class));
         schemeManager.unregister(schemeManager.get(PhotoStoryBinding.class));
     }
 }

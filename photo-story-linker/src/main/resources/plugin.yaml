@@ -9,11 +9,11 @@ spec:
     name: xiongfan
     website: https://xiongfan.me
   logo: logo.png
-  homepage: https://github.com/2150489918xf-a11y/photo-story-linker#readme
-  repo: https://github.com/2150489918xf-a11y/photo-story-linker
-  issues: https://github.com/2150489918xf-a11y/photo-story-linker/issues
-  displayName: "Photo Story Linker"
-  description: "Bind Halo Photos to story posts and enhance gallery previews."
+  homepage: https://github.com/2150489918xf-a11y/blog-plugs/tree/main/photo-story-linker#readme
+  repo: https://github.com/2150489918xf-a11y/blog-plugs
+  issues: https://github.com/2150489918xf-a11y/blog-plugs/issues
+  displayName: "日记故事"
+  description: "Use Halo single pages for diary stories and optionally link gallery photos to them."
   license:
     - name: "GPL-3.0"
-      url: "https://github.com/2150489918xf-a11y/photo-story-linker/blob/main/LICENSE"
+      url: "https://github.com/2150489918xf-a11y/blog-plugs/blob/main/photo-story-linker/LICENSE"

@@ -8,6 +8,10 @@ type Metadata = {
   deletionTimestamp?: string
 }
 
+type Visible = 'PUBLIC' | 'INTERNAL' | 'PRIVATE'
+type TargetKind = 'POST' | 'SINGLE_PAGE'
+type Mode = 'journal' | 'existing'
+
 type Photo = {
   metadata: Metadata
   spec: {
@@ -20,14 +24,15 @@ type Photo = {
   }
 }
 
-type Post = {
+type ContentItem = {
   metadata: Metadata
   spec: {
     title?: string
     publish?: boolean
     deleted?: boolean
-    visible?: 'PUBLIC' | 'INTERNAL' | 'PRIVATE'
+    visible?: Visible
     slug?: string
+    cover?: string
   }
   status?: {
     permalink?: string
@@ -39,7 +44,9 @@ type Binding = {
   metadata: Metadata
   spec: {
     photoName: string
-    postName: string
+    postName?: string
+    targetKind?: TargetKind
+    targetName?: string
     teaser?: string
     badgeText?: string
     enabled?: boolean
@@ -47,31 +54,56 @@ type Binding = {
   }
 }
 
-type Mode = 'existing' | 'new'
+type JournalEntry = {
+  metadata: Metadata
+  spec: {
+    singlePageName: string
+    coverPhotoName?: string
+    photoNames?: string[]
+    journalDate?: string
+    teaser?: string
+    enabled?: boolean
+    showInJournalList?: boolean
+    mood?: string
+    location?: string
+    weather?: string
+  }
+}
 
 const bindingApi = '/apis/photo-story-linker.xiongfan.me/v1alpha1/photostorybindings'
+const journalApi = '/apis/photo-story-linker.xiongfan.me/v1alpha1/journalentries'
 const photoApi = '/apis/core.halo.run/v1alpha1/photos'
 const postApi = '/apis/content.halo.run/v1alpha1/posts'
-const consolePostApi = '/apis/api.console.halo.run/v1alpha1/posts'
+const singlePageApi = '/apis/content.halo.run/v1alpha1/singlepages'
+const consoleSinglePageApi = '/apis/api.console.halo.run/v1alpha1/singlepages'
 
 const bindings = ref<Binding[]>([])
+const journals = ref<JournalEntry[]>([])
 const photos = ref<Photo[]>([])
-const posts = ref<Post[]>([])
+const posts = ref<ContentItem[]>([])
+const pages = ref<ContentItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 const notice = ref('')
 const query = ref('')
-const postQuery = ref('')
+const targetQuery = ref('')
 const selectedPhotoName = ref('')
-const mode = ref<Mode>('existing')
+const mode = ref<Mode>('journal')
 
 const form = ref({
-  postName: '',
-  storyTitle: '',
+  targetKind: 'SINGLE_PAGE' as TargetKind,
+  targetName: '',
+  title: '',
   teaser: '',
-  badgeText: '阅读故事',
+  badgeText: '阅读日记',
   openMode: 'SAME_TAB' as 'SAME_TAB' | 'NEW_TAB',
+  visible: 'PUBLIC' as Visible,
+  showInJournalList: true,
+  journalDate: today(),
+  mood: '',
+  location: '',
+  weather: '',
 })
 
 const bindingByPhotoName = computed(() => {
@@ -80,16 +112,27 @@ const bindingByPhotoName = computed(() => {
 
 const photoByName = computed(() => new Map(photos.value.map((photo) => [photo.metadata.name, photo])))
 const postByName = computed(() => new Map(posts.value.map((post) => [post.metadata.name, post])))
+const pageByName = computed(() => new Map(pages.value.map((page) => [page.metadata.name, page])))
+const journalByPageName = computed(() => {
+  return new Map(journals.value.map((journal) => [journal.spec.singlePageName, journal]))
+})
 
 const selectedPhoto = computed(() => photoByName.value.get(selectedPhotoName.value))
 const selectedBinding = computed(() => bindingByPhotoName.value.get(selectedPhotoName.value))
-const selectedPost = computed(() => {
-  const postName = selectedBinding.value?.spec.postName || form.value.postName
-  return postByName.value.get(postName)
+
+const selectedTarget = computed(() => {
+  if (form.value.targetKind === 'POST') {
+    return postByName.value.get(form.value.targetName)
+  }
+  return pageByName.value.get(form.value.targetName)
 })
 
 const availablePosts = computed(() =>
   posts.value.filter((post) => !post.spec.deleted && !post.metadata.deletionTimestamp)
+)
+
+const availablePages = computed(() =>
+  pages.value.filter((page) => !page.spec.deleted && !page.metadata.deletionTimestamp)
 )
 
 const filteredPhotos = computed(() => {
@@ -97,8 +140,8 @@ const filteredPhotos = computed(() => {
   if (!keyword) {
     return photos.value
   }
-  return photos.value.filter((photo) => {
-    const text = [
+  return photos.value.filter((photo) =>
+    [
       photo.metadata.name,
       photo.spec.displayName,
       photo.spec.description,
@@ -107,34 +150,43 @@ const filteredPhotos = computed(() => {
     ]
       .join(' ')
       .toLowerCase()
-    return text.includes(keyword)
-  })
+      .includes(keyword)
+  )
 })
 
-const filteredPosts = computed(() => {
-  const keyword = normalize(postQuery.value).toLowerCase()
+const filteredTargets = computed(() => {
+  const source = form.value.targetKind === 'POST' ? availablePosts.value : availablePages.value
+  const keyword = normalize(targetQuery.value).toLowerCase()
   if (!keyword) {
-    return availablePosts.value
+    return source
   }
-  return availablePosts.value.filter((post) => {
-    const text = [post.metadata.name, post.spec.title, post.status?.excerpt, post.status?.permalink]
+  return source.filter((item) =>
+    [item.metadata.name, item.spec.title, item.status?.excerpt, item.status?.permalink]
       .join(' ')
       .toLowerCase()
-    return text.includes(keyword)
-  })
+      .includes(keyword)
+  )
 })
 
-const stats = computed(() => {
-  const enabled = bindings.value.filter((binding) => binding.spec.enabled !== false).length
-  return {
-    photos: photos.value.length,
-    bindings: bindings.value.length,
-    enabled,
+const stats = computed(() => ({
+  journals: journals.value.length,
+  bindings: bindings.value.length,
+  photos: photos.value.length,
+}))
+
+const saveExistingDisabled = computed(() => {
+  if (saving.value || !form.value.targetName) {
+    return true
   }
+  return form.value.targetKind === 'POST' && !selectedPhotoName.value
 })
 
 function normalize(value?: string) {
   return String(value || '').trim()
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10)
 }
 
 function slugify(value: string) {
@@ -142,80 +194,153 @@ function slugify(value: string) {
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
     .replace(/^-+|-+$/g, '')
-  return cleaned || `story-${Date.now()}`
+  return cleaned || `journal-${Date.now()}`
+}
+
+function journalNameFor(singlePageName: string) {
+  return `journal-${singlePageName}`.replace(/[^a-z0-9-]/gi, '-').toLowerCase()
+}
+
+function resolveBindingTarget(binding: Binding) {
+  const targetKind = binding.spec.targetKind || 'POST'
+  const targetName = binding.spec.targetName || binding.spec.postName || ''
+  return { targetKind, targetName }
+}
+
+function applyJournalToForm(singlePageName: string) {
+  const journal = journalByPageName.value.get(singlePageName)
+  if (!journal) {
+    return
+  }
+  form.value.journalDate = journal.spec.journalDate || today()
+  form.value.teaser = journal.spec.teaser || form.value.teaser
+  form.value.showInJournalList = journal.spec.showInJournalList !== false
+  form.value.mood = journal.spec.mood || ''
+  form.value.location = journal.spec.location || ''
+  form.value.weather = journal.spec.weather || ''
+}
+
+function resetJournalFields() {
+  form.value.visible = 'PUBLIC'
+  form.value.showInJournalList = true
+  form.value.journalDate = today()
+  form.value.mood = ''
+  form.value.location = ''
+  form.value.weather = ''
+}
+
+function selectNoPhoto() {
+  selectedPhotoName.value = ''
+  mode.value = 'journal'
+  resetJournalFields()
+  form.value.title = '新的日记'
+  form.value.teaser = ''
+  form.value.badgeText = '阅读日记'
+  form.value.openMode = 'SAME_TAB'
+  form.value.targetKind = 'SINGLE_PAGE'
+  form.value.targetName = availablePages.value[0]?.metadata.name || ''
 }
 
 function selectPhoto(photo: Photo) {
   selectedPhotoName.value = photo.metadata.name
   const binding = bindingByPhotoName.value.get(photo.metadata.name)
   if (binding) {
+    const target = resolveBindingTarget(binding)
     mode.value = 'existing'
-    form.value.postName = binding.spec.postName
+    resetJournalFields()
+    form.value.targetKind = target.targetKind
+    form.value.targetName = target.targetName
     form.value.teaser = binding.spec.teaser || ''
-    form.value.badgeText = binding.spec.badgeText || '阅读故事'
+    form.value.badgeText = binding.spec.badgeText || '阅读日记'
     form.value.openMode = binding.spec.openMode || 'SAME_TAB'
+    if (target.targetKind === 'SINGLE_PAGE') {
+      applyJournalToForm(target.targetName)
+    }
     return
   }
-  form.value.postName = availablePosts.value[0]?.metadata.name || ''
-  form.value.storyTitle = photo.spec.displayName ? `${photo.spec.displayName}的故事` : ''
+  mode.value = 'journal'
+  resetJournalFields()
+  form.value.targetKind = 'SINGLE_PAGE'
+  form.value.targetName = availablePages.value[0]?.metadata.name || ''
+  form.value.title = photo.spec.displayName ? `${photo.spec.displayName}的日记` : '新的日记'
   form.value.teaser = photo.spec.description || ''
-  form.value.badgeText = '阅读故事'
+  form.value.badgeText = '阅读日记'
   form.value.openMode = 'SAME_TAB'
 }
 
-function photoTitle(name: string) {
+function photoTitle(name?: string) {
+  if (!name) {
+    return '未绑定图片'
+  }
   const photo = photoByName.value.get(name)
   return photo?.spec.displayName || name
 }
 
-function postTitle(name: string) {
-  const post = postByName.value.get(name)
-  return post?.spec.title || name
+function targetTitle(kind?: TargetKind, name?: string) {
+  if (!name) {
+    return '未绑定内容'
+  }
+  const item = kind === 'SINGLE_PAGE' ? pageByName.value.get(name) : postByName.value.get(name)
+  return item?.spec.title || name
 }
 
-function postStatus(post?: Post) {
-  if (!post) {
-    return '文章不存在'
+function contentStatus(item?: ContentItem) {
+  if (!item) {
+    return '内容不存在'
   }
-  if (post.spec.deleted || post.metadata.deletionTimestamp) {
+  if (item.spec.deleted || item.metadata.deletionTimestamp) {
     return '已删除'
   }
-  if (!post.spec.publish) {
+  if (!item.spec.publish) {
     return '草稿'
   }
-  if (post.spec.visible !== 'PUBLIC') {
-    return '非公开'
+  if (item.spec.visible === 'INTERNAL') {
+    return '登录可见'
+  }
+  if (item.spec.visible === 'PRIVATE') {
+    return '私密'
   }
   return '公开'
 }
 
-function postEditUrl(postName?: string) {
-  if (!postName) {
+function editUrl(kind?: TargetKind, name?: string) {
+  if (!name) {
     return ''
   }
-  return `/console/posts/editor?name=${encodeURIComponent(postName)}`
+  if (kind === 'POST') {
+    return `/console/posts/editor?name=${encodeURIComponent(name)}`
+  }
+  return `/console/single-pages/editor?name=${encodeURIComponent(name)}`
+}
+
+function targetOptionsChanged() {
+  form.value.targetName = filteredTargets.value[0]?.metadata.name || ''
 }
 
 async function fetchAll() {
   loading.value = true
   error.value = ''
-  notice.value = ''
   try {
-    const [bindingRes, photoRes, postRes] = await Promise.all([
+    const [bindingRes, journalRes, photoRes, postRes, pageRes] = await Promise.all([
       axios.get(bindingApi, { params: { page: 1, size: 500 } }),
+      axios.get(journalApi, { params: { page: 1, size: 500 } }),
       axios.get(photoApi, { params: { page: 1, size: 500 } }),
       axios.get(postApi, { params: { page: 1, size: 500 } }),
+      axios.get(singlePageApi, { params: { page: 1, size: 500 } }),
     ])
     bindings.value = bindingRes.data.items || []
+    journals.value = journalRes.data.items || []
     photos.value = photoRes.data.items || []
     posts.value = postRes.data.items || []
-    if (!selectedPhotoName.value && photos.value.length) {
-      selectPhoto(photos.value[0])
-    } else if (selectedPhotoName.value) {
+    pages.value = pageRes.data.items || []
+
+    if (selectedPhotoName.value) {
       const photo = photoByName.value.get(selectedPhotoName.value)
       if (photo) {
         selectPhoto(photo)
       }
+    } else if (!form.value.title) {
+      selectNoPhoto()
     }
   } catch (err) {
     error.value = String((err as Error).message || err)
@@ -224,9 +349,8 @@ async function fetchAll() {
   }
 }
 
-async function upsertBinding(postName: string) {
-  if (!selectedPhotoName.value || !postName) {
-    error.value = '请选择图片和故事文章。'
+async function upsertBinding(targetKind: TargetKind, targetName: string) {
+  if (!selectedPhotoName.value || !targetName) {
     return
   }
   const current = selectedBinding.value
@@ -238,9 +362,11 @@ async function upsertBinding(postName: string) {
     },
     spec: {
       photoName: selectedPhotoName.value,
-      postName,
+      postName: targetKind === 'POST' ? targetName : '',
+      targetKind,
+      targetName,
       teaser: form.value.teaser,
-      badgeText: form.value.badgeText || '阅读故事',
+      badgeText: form.value.badgeText || '阅读日记',
       enabled: true,
       openMode: form.value.openMode,
     },
@@ -251,61 +377,92 @@ async function upsertBinding(postName: string) {
       [
         { op: 'add', path: '/spec/photoName', value: payload.spec.photoName },
         { op: 'add', path: '/spec/postName', value: payload.spec.postName },
+        { op: 'add', path: '/spec/targetKind', value: payload.spec.targetKind },
+        { op: 'add', path: '/spec/targetName', value: payload.spec.targetName },
         { op: 'add', path: '/spec/teaser', value: payload.spec.teaser },
         { op: 'add', path: '/spec/badgeText', value: payload.spec.badgeText },
         { op: 'add', path: '/spec/enabled', value: payload.spec.enabled },
         { op: 'add', path: '/spec/openMode', value: payload.spec.openMode },
       ],
-      {
-        headers: { 'Content-Type': 'application/json-patch+json' },
-      }
+      { headers: { 'Content-Type': 'application/json-patch+json' } }
     )
   } else {
     await axios.post(bindingApi, payload)
   }
 }
 
-async function bindExistingPost() {
-  saving.value = true
-  error.value = ''
-  notice.value = ''
-  try {
-    await upsertBinding(form.value.postName)
-    notice.value = '已保存图片故事绑定。'
-    await fetchAll()
-  } catch (err) {
-    error.value = String((err as Error).message || err)
-  } finally {
-    saving.value = false
+async function upsertJournalEntry(singlePageName: string) {
+  const current = journalByPageName.value.get(singlePageName)
+  const photoNames = new Set(current?.spec.photoNames || [])
+  if (selectedPhotoName.value) {
+    photoNames.add(selectedPhotoName.value)
+  }
+  const payload = {
+    apiVersion: 'photo-story-linker.xiongfan.me/v1alpha1',
+    kind: 'JournalEntry',
+    metadata: {
+      name: current?.metadata.name || journalNameFor(singlePageName),
+    },
+    spec: {
+      singlePageName,
+      coverPhotoName: selectedPhotoName.value || current?.spec.coverPhotoName || '',
+      photoNames: Array.from(photoNames),
+      journalDate: form.value.journalDate || today(),
+      teaser: form.value.teaser,
+      enabled: true,
+      showInJournalList: form.value.showInJournalList,
+      mood: form.value.mood,
+      location: form.value.location,
+      weather: form.value.weather,
+    },
+  }
+  if (current) {
+    await axios.patch(
+      `${journalApi}/${current.metadata.name}`,
+      [
+        { op: 'add', path: '/spec/singlePageName', value: payload.spec.singlePageName },
+        { op: 'add', path: '/spec/coverPhotoName', value: payload.spec.coverPhotoName },
+        { op: 'add', path: '/spec/photoNames', value: payload.spec.photoNames },
+        { op: 'add', path: '/spec/journalDate', value: payload.spec.journalDate },
+        { op: 'add', path: '/spec/teaser', value: payload.spec.teaser },
+        { op: 'add', path: '/spec/enabled', value: payload.spec.enabled },
+        { op: 'add', path: '/spec/showInJournalList', value: payload.spec.showInJournalList },
+        { op: 'add', path: '/spec/mood', value: payload.spec.mood },
+        { op: 'add', path: '/spec/location', value: payload.spec.location },
+        { op: 'add', path: '/spec/weather', value: payload.spec.weather },
+      ],
+      { headers: { 'Content-Type': 'application/json-patch+json' } }
+    )
+  } else {
+    await axios.post(journalApi, payload)
   }
 }
 
-async function createStoryDraft() {
-  if (!selectedPhoto.value) {
-    error.value = '请先选择一张图片。'
-    return
-  }
-  const title = normalize(form.value.storyTitle) || `${selectedPhoto.value.spec.displayName || '图片'}的故事`
+async function createJournalDraft() {
+  const title = normalize(form.value.title) || selectedPhoto.value?.spec.displayName || '新的日记'
   saving.value = true
   error.value = ''
   notice.value = ''
   try {
     const content = [
-      selectedPhoto.value.spec.url ? `![${selectedPhoto.value.spec.displayName || title}](${selectedPhoto.value.spec.url})` : '',
+      selectedPhoto.value?.spec.url
+        ? `![${selectedPhoto.value.spec.displayName || title}](${selectedPhoto.value.spec.url})`
+        : '',
       '',
-      form.value.teaser || selectedPhoto.value.spec.description || '',
+      form.value.teaser || selectedPhoto.value?.spec.description || '',
     ]
       .filter(Boolean)
       .join('\n')
-    const { data: post } = await axios.post(consolePostApi, {
-      post: {
+    const { data: singlePage } = await axios.post(consoleSinglePageApi, {
+      singlePage: {
         apiVersion: 'content.halo.run/v1alpha1',
-        kind: 'Post',
+        kind: 'SinglePage',
         metadata: {
           name: '',
-          generateName: 'post-',
+          generateName: 'singlepage-',
           annotations: {
-            'photo-story-linker.xiongfan.me/photo-name': selectedPhoto.value.metadata.name,
+            'photo-story-linker.xiongfan.me/type': 'journal',
+            'photo-story-linker.xiongfan.me/photo-name': selectedPhotoName.value || '',
           },
         },
         spec: {
@@ -316,13 +473,12 @@ async function createStoryDraft() {
           pinned: false,
           allowComment: true,
           priority: 0,
-          visible: 'PUBLIC',
+          visible: form.value.visible,
+          cover: selectedPhoto.value?.spec.url || selectedPhoto.value?.spec.cover || '',
           excerpt: {
             autoGenerate: !normalize(form.value.teaser),
             raw: normalize(form.value.teaser) || undefined,
           },
-          categories: [],
-          tags: ['图片故事'],
         },
       },
       content: {
@@ -331,9 +487,40 @@ async function createStoryDraft() {
         content,
       },
     })
-    form.value.postName = post.metadata.name
-    await upsertBinding(post.metadata.name)
-    notice.value = '已创建故事草稿并完成绑定。发布文章后，前台访客即可看到故事入口。'
+    form.value.targetKind = 'SINGLE_PAGE'
+    form.value.targetName = singlePage.metadata.name
+    await upsertJournalEntry(singlePage.metadata.name)
+    if (selectedPhotoName.value) {
+      await upsertBinding('SINGLE_PAGE', singlePage.metadata.name)
+    }
+    window.location.href = editUrl('SINGLE_PAGE', singlePage.metadata.name)
+  } catch (err) {
+    error.value = String((err as Error).message || err)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveExistingTarget() {
+  if (!form.value.targetName) {
+    error.value = '请选择要绑定或加入日记列表的内容。'
+    return
+  }
+  if (form.value.targetKind === 'POST' && !selectedPhotoName.value) {
+    error.value = '文章只能作为图库图片的故事目标，请先选择一张图片。'
+    return
+  }
+  saving.value = true
+  error.value = ''
+  notice.value = ''
+  try {
+    if (selectedPhotoName.value) {
+      await upsertBinding(form.value.targetKind, form.value.targetName)
+    }
+    if (form.value.targetKind === 'SINGLE_PAGE') {
+      await upsertJournalEntry(form.value.targetName)
+    }
+    notice.value = selectedPhotoName.value ? '已保存绑定。' : '已加入日记列表。'
     await fetchAll()
   } catch (err) {
     error.value = String((err as Error).message || err)
@@ -345,20 +532,11 @@ async function createStoryDraft() {
 async function toggleBinding(binding: Binding) {
   saving.value = true
   error.value = ''
-  notice.value = ''
   try {
     await axios.patch(
       `${bindingApi}/${binding.metadata.name}`,
-      [
-        {
-          op: 'add',
-          path: '/spec/enabled',
-          value: binding.spec.enabled === false,
-        },
-      ],
-      {
-        headers: { 'Content-Type': 'application/json-patch+json' },
-      }
+      [{ op: 'add', path: '/spec/enabled', value: binding.spec.enabled === false }],
+      { headers: { 'Content-Type': 'application/json-patch+json' } }
     )
     await fetchAll()
   } catch (err) {
@@ -374,7 +552,7 @@ async function deleteBinding(binding: Binding) {
   notice.value = ''
   try {
     await axios.delete(`${bindingApi}/${binding.metadata.name}`)
-    notice.value = '已解除绑定，图片和文章都不会被删除。'
+    notice.value = '已解除绑定，图片和内容都不会被删除。'
     await fetchAll()
   } catch (err) {
     error.value = String((err as Error).message || err)
@@ -390,26 +568,29 @@ onMounted(fetchAll)
   <main class="psl-page">
     <header class="psl-header">
       <div>
-        <h1>Photo Stories</h1>
-        <p>把图库图片绑定到 Halo 文章；故事内容继续由 Halo 原生文章系统管理。</p>
+        <h1>日记故事</h1>
+        <p>日记内容保存为 Halo 单页面，图库图片可以作为可选入口。</p>
       </div>
-      <button type="button" class="psl-button psl-button-secondary" :disabled="loading" @click="fetchAll">
-        {{ loading ? '加载中...' : '刷新' }}
-      </button>
+      <div class="psl-header-actions">
+        <a class="psl-link-button" href="/journals" target="_blank" rel="noreferrer">查看日记页</a>
+        <button type="button" class="psl-button psl-button-secondary" :disabled="loading" @click="fetchAll">
+          {{ loading ? '加载中...' : '刷新' }}
+        </button>
+      </div>
     </header>
 
     <section class="psl-stats">
       <div>
-        <strong>{{ stats.photos }}</strong>
-        <span>图片</span>
+        <strong>{{ stats.journals }}</strong>
+        <span>日记</span>
       </div>
       <div>
         <strong>{{ stats.bindings }}</strong>
-        <span>绑定</span>
+        <span>图片绑定</span>
       </div>
       <div>
-        <strong>{{ stats.enabled }}</strong>
-        <span>启用中</span>
+        <strong>{{ stats.photos }}</strong>
+        <span>图库图片</span>
       </div>
     </section>
 
@@ -419,10 +600,24 @@ onMounted(fetchAll)
     <section class="psl-workspace">
       <aside class="psl-panel psl-photo-panel">
         <div class="psl-panel-head">
-          <h2>选择图片</h2>
+          <h2>关联图片</h2>
           <input v-model="query" type="search" placeholder="搜索图片、描述、分组或标签" />
         </div>
-        <div v-if="!photos.length && !loading" class="psl-empty">未检测到图库图片，请先启用图库管理并添加图片。</div>
+
+        <button
+          type="button"
+          class="psl-photo-item"
+          :class="{ 'is-active': !selectedPhotoName }"
+          @click="selectNoPhoto"
+        >
+          <span class="psl-photo-placeholder">无</span>
+          <span>
+            <strong>不绑定图片</strong>
+            <small>创建独立日记</small>
+          </span>
+        </button>
+
+        <div v-if="!photos.length && !loading" class="psl-empty">未检测到图库图片。</div>
         <div v-else class="psl-photo-list">
           <button
             v-for="photo in filteredPhotos"
@@ -432,10 +627,10 @@ onMounted(fetchAll)
             :class="{ 'is-active': selectedPhotoName === photo.metadata.name }"
             @click="selectPhoto(photo)"
           >
-            <img :src="photo.spec.cover || photo.spec.url" :alt="photo.spec.displayName || photo.metadata.name" />
+            <img :src="photo.spec.cover || photo.spec.url || ''" :alt="photo.spec.displayName || photo.metadata.name" />
             <span>
               <strong>{{ photo.spec.displayName || photo.metadata.name }}</strong>
-              <small>{{ bindingByPhotoName.has(photo.metadata.name) ? '已绑定故事' : '未绑定' }}</small>
+              <small>{{ bindingByPhotoName.has(photo.metadata.name) ? '已绑定' : '未绑定' }}</small>
             </span>
           </button>
         </div>
@@ -443,111 +638,172 @@ onMounted(fetchAll)
 
       <section class="psl-panel psl-editor-panel">
         <div class="psl-panel-head">
-          <h2>{{ selectedPhoto ? '绑定故事' : '等待选择图片' }}</h2>
-          <span v-if="selectedBinding" class="psl-pill">当前已绑定</span>
+          <h2>{{ selectedPhoto ? '为图片创建/绑定日记' : '创建日记' }}</h2>
+          <span v-if="selectedBinding" class="psl-pill">当前图片已绑定</span>
         </div>
 
-        <div v-if="selectedPhoto" class="psl-editor">
-          <div class="psl-selected-photo">
-            <img :src="selectedPhoto.spec.cover || selectedPhoto.spec.url" :alt="selectedPhoto.spec.displayName" />
-            <div>
-              <strong>{{ selectedPhoto.spec.displayName || selectedPhoto.metadata.name }}</strong>
-              <p>{{ selectedPhoto.spec.description || '这张图片暂无图库描述。' }}</p>
-            </div>
+        <div class="psl-selected-photo">
+          <img
+            v-if="selectedPhoto"
+            :src="selectedPhoto.spec.cover || selectedPhoto.spec.url || ''"
+            :alt="selectedPhoto.spec.displayName || selectedPhoto.metadata.name"
+          />
+          <div v-else class="psl-photo-placeholder psl-large">无</div>
+          <div>
+            <strong>{{ selectedPhoto ? photoTitle(selectedPhoto.metadata.name) : '不绑定图片' }}</strong>
+            <p>{{ selectedPhoto?.spec.description || '日记可以独立创建，也可以关联一张图库图片作为入口。' }}</p>
           </div>
+        </div>
 
-          <div class="psl-tabs" role="tablist" aria-label="Story mode">
-            <button type="button" :class="{ 'is-active': mode === 'existing' }" @click="mode = 'existing'">
-              绑定已有文章
-            </button>
-            <button type="button" :class="{ 'is-active': mode === 'new' }" @click="mode = 'new'">
-              创建故事草稿
-            </button>
-          </div>
+        <div class="psl-tabs" role="tablist" aria-label="日记操作模式">
+          <button type="button" :class="{ 'is-active': mode === 'journal' }" @click="mode = 'journal'">
+            创建日记
+          </button>
+          <button type="button" :class="{ 'is-active': mode === 'existing' }" @click="mode = 'existing'">
+            绑定已有内容
+          </button>
+        </div>
 
-          <form v-if="mode === 'existing'" class="psl-form" @submit.prevent="bindExistingPost">
+        <form v-if="mode === 'journal'" class="psl-form" @submit.prevent="createJournalDraft">
+          <label>
+            <span>日记标题</span>
+            <input v-model="form.title" type="text" placeholder="例如：一次黄昏里的火箭发射" />
+          </label>
+
+          <div class="psl-two">
             <label>
-              <span>搜索文章</span>
-              <input v-model="postQuery" type="search" placeholder="输入标题或链接过滤文章" />
+              <span>日记日期</span>
+              <input v-model="form.journalDate" type="date" />
             </label>
             <label>
-              <span>故事文章</span>
-              <select v-model="form.postName">
-                <option v-for="post in filteredPosts" :key="post.metadata.name" :value="post.metadata.name">
-                  {{ post.spec.title || post.metadata.name }} - {{ postStatus(post) }}
-                </option>
+              <span>可见性</span>
+              <select v-model="form.visible">
+                <option value="PUBLIC">公开</option>
+                <option value="INTERNAL">登录可见</option>
+                <option value="PRIVATE">私密</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            <span>摘要/悬停预览文案</span>
+            <textarea v-model="form.teaser" rows="4" placeholder="会写入日记摘要，也会作为图片悬停预览。"></textarea>
+          </label>
+
+          <div class="psl-two">
+            <label>
+              <span>心情</span>
+              <input v-model="form.mood" type="text" placeholder="例如：期待" />
+            </label>
+            <label>
+              <span>地点</span>
+              <input v-model="form.location" type="text" placeholder="例如：广州" />
+            </label>
+          </div>
+
+          <label>
+            <span>天气</span>
+            <input v-model="form.weather" type="text" placeholder="例如：晴" />
+          </label>
+
+          <label class="psl-check">
+            <input v-model="form.showInJournalList" type="checkbox" />
+            <span>展示在 /journals 日记列表</span>
+          </label>
+
+          <div class="psl-actions">
+            <button type="submit" class="psl-button" :disabled="saving">创建日记并编辑</button>
+          </div>
+        </form>
+
+        <form v-else class="psl-form" @submit.prevent="saveExistingTarget">
+          <div class="psl-two">
+            <label>
+              <span>内容类型</span>
+              <select v-model="form.targetKind" @change="targetOptionsChanged">
+                <option value="SINGLE_PAGE">日记/页面</option>
+                <option value="POST">文章</option>
               </select>
             </label>
             <label>
-              <span>悬停预览文案</span>
-              <textarea v-model="form.teaser" rows="4" placeholder="留空时使用文章摘要。"></textarea>
+              <span>搜索内容</span>
+              <input v-model="targetQuery" type="search" placeholder="输入标题或链接过滤" />
             </label>
-            <div class="psl-two">
-              <label>
-                <span>按钮文案</span>
-                <input v-model="form.badgeText" type="text" />
-              </label>
-              <label>
-                <span>打开方式</span>
-                <select v-model="form.openMode">
-                  <option value="SAME_TAB">当前窗口</option>
-                  <option value="NEW_TAB">新窗口</option>
-                </select>
-              </label>
-            </div>
-            <div class="psl-actions">
-              <button type="submit" class="psl-button" :disabled="saving || !form.postName">
-                {{ selectedBinding ? '保存绑定' : '绑定文章' }}
-              </button>
-              <a v-if="selectedPost" class="psl-link-button" :href="postEditUrl(selectedPost.metadata.name)">
-                编辑文章
-              </a>
-            </div>
-          </form>
+          </div>
 
-          <form v-else class="psl-form" @submit.prevent="createStoryDraft">
+          <label>
+            <span>绑定目标</span>
+            <select v-model="form.targetName">
+              <option v-for="item in filteredTargets" :key="item.metadata.name" :value="item.metadata.name">
+                {{ item.spec.title || item.metadata.name }} - {{ contentStatus(item) }}
+              </option>
+            </select>
+          </label>
+
+          <label>
+            <span>悬停预览文案</span>
+            <textarea v-model="form.teaser" rows="4" placeholder="留空时使用目标内容摘要。"></textarea>
+          </label>
+
+          <div class="psl-two">
             <label>
-              <span>故事标题</span>
-              <input v-model="form.storyTitle" type="text" placeholder="例如：一次黄昏里的火箭发射" />
+              <span>按钮文案</span>
+              <input v-model="form.badgeText" type="text" />
             </label>
             <label>
-              <span>草稿摘要</span>
-              <textarea v-model="form.teaser" rows="4" placeholder="会作为故事预览文案，也会写入文章摘要。"></textarea>
+              <span>打开方式</span>
+              <select v-model="form.openMode">
+                <option value="SAME_TAB">当前窗口</option>
+                <option value="NEW_TAB">新窗口</option>
+              </select>
             </label>
-            <div class="psl-two">
-              <label>
-                <span>按钮文案</span>
-                <input v-model="form.badgeText" type="text" />
-              </label>
-              <label>
-                <span>打开方式</span>
-                <select v-model="form.openMode">
-                  <option value="SAME_TAB">当前窗口</option>
-                  <option value="NEW_TAB">新窗口</option>
-                </select>
-              </label>
-            </div>
-            <div class="psl-actions">
-              <button type="submit" class="psl-button" :disabled="saving">
-                创建草稿并绑定
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
 
-        <div v-else class="psl-empty">请先从左侧选择一张图片。</div>
+          <label v-if="form.targetKind === 'SINGLE_PAGE'" class="psl-check">
+            <input v-model="form.showInJournalList" type="checkbox" />
+            <span>展示在 /journals 日记列表</span>
+          </label>
+
+          <div class="psl-actions">
+            <button type="submit" class="psl-button" :disabled="saveExistingDisabled">保存</button>
+            <a v-if="selectedTarget" class="psl-link-button" :href="editUrl(form.targetKind, selectedTarget.metadata.name)">
+              编辑内容
+            </a>
+          </div>
+        </form>
       </section>
 
       <aside class="psl-panel psl-bindings-panel">
         <div class="psl-panel-head">
-          <h2>当前绑定</h2>
+          <h2>当前日记</h2>
         </div>
-        <div v-if="!bindings.length" class="psl-empty">还没有图片故事绑定。</div>
+
+        <div v-if="!journals.length" class="psl-empty">还没有日记索引。</div>
+        <article v-for="journal in journals" :key="journal.metadata.name" class="psl-binding">
+          <div>
+            <strong>{{ targetTitle('SINGLE_PAGE', journal.spec.singlePageName) }}</strong>
+            <span>{{ journal.spec.journalDate || '未设置日期' }}</span>
+            <small>{{ journal.spec.showInJournalList === false ? '不进列表' : '进入列表' }}</small>
+          </div>
+          <a class="psl-mini" :href="editUrl('SINGLE_PAGE', journal.spec.singlePageName)">编辑</a>
+        </article>
+
+        <div class="psl-panel-head psl-secondary-head">
+          <h2>图片绑定</h2>
+        </div>
+        <div v-if="!bindings.length" class="psl-empty">还没有图片绑定。</div>
         <article v-for="binding in bindings" :key="binding.metadata.name" class="psl-binding">
           <div>
             <strong>{{ photoTitle(binding.spec.photoName) }}</strong>
-            <span>{{ postTitle(binding.spec.postName) }}</span>
-            <small>{{ binding.spec.enabled === false ? '已停用' : postStatus(postByName.get(binding.spec.postName)) }}</small>
+            <span>
+              {{
+                targetTitle(
+                  resolveBindingTarget(binding).targetKind,
+                  resolveBindingTarget(binding).targetName
+                )
+              }}
+            </span>
+            <small>{{ binding.spec.enabled === false ? '已停用' : '启用中' }}</small>
           </div>
           <div class="psl-binding-actions">
             <button type="button" class="psl-mini" :disabled="saving" @click="toggleBinding(binding)">
@@ -573,6 +829,7 @@ onMounted(fetchAll)
 }
 
 .psl-header,
+.psl-header-actions,
 .psl-panel-head,
 .psl-actions,
 .psl-binding-actions {
@@ -597,9 +854,14 @@ onMounted(fetchAll)
   color: #4b5563;
 }
 
+.psl-header-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .psl-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
@@ -664,6 +926,12 @@ onMounted(fetchAll)
   flex-wrap: wrap;
 }
 
+.psl-secondary-head {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
 .psl-panel-head input,
 .psl-form input,
 .psl-form select,
@@ -688,7 +956,7 @@ onMounted(fetchAll)
   width: 100%;
   min-height: 4.5rem;
   display: grid;
-  grid-template-columns: 4.5rem 1fr;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
   gap: 0.75rem;
   align-items: center;
   padding: 0.5rem;
@@ -706,12 +974,25 @@ onMounted(fetchAll)
 }
 
 .psl-photo-item img,
-.psl-selected-photo img {
+.psl-selected-photo img,
+.psl-photo-placeholder {
   width: 100%;
   height: 100%;
   border-radius: 0.375rem;
   object-fit: cover;
   background: #e5e7eb;
+}
+
+.psl-photo-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-weight: 800;
+}
+
+.psl-photo-placeholder.psl-large {
+  min-height: 6rem;
 }
 
 .psl-photo-item span,
@@ -728,16 +1009,14 @@ onMounted(fetchAll)
   white-space: nowrap;
 }
 
-.psl-editor,
+.psl-selected-photo,
 .psl-form {
   display: grid;
   gap: 1rem;
 }
 
 .psl-selected-photo {
-  display: grid;
-  grid-template-columns: 6rem 1fr;
-  gap: 0.875rem;
+  grid-template-columns: 6rem minmax(0, 1fr);
   align-items: center;
 }
 
@@ -777,6 +1056,16 @@ onMounted(fetchAll)
   gap: 0.375rem;
   font-size: 0.875rem;
   font-weight: 700;
+}
+
+.psl-check {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.psl-check input {
+  width: 1rem;
+  min-height: 1rem;
 }
 
 .psl-two {
@@ -836,9 +1125,13 @@ onMounted(fetchAll)
 }
 
 .psl-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 0.75rem;
   background: #f3f4f6;
   color: #111827;
+  text-decoration: none;
 }
 
 .psl-danger {
@@ -864,7 +1157,7 @@ onMounted(fetchAll)
 
 @media (min-width: 1280px) {
   .psl-workspace {
-    grid-template-columns: minmax(18rem, 23rem) minmax(28rem, 1fr) minmax(18rem, 24rem);
+    grid-template-columns: minmax(18rem, 23rem) minmax(30rem, 1fr) minmax(18rem, 24rem);
     align-items: start;
   }
 }

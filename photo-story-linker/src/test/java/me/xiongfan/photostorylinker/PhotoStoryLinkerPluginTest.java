@@ -10,6 +10,7 @@ import run.halo.app.extension.SchemeManager;
 import run.halo.app.plugin.PluginContext;
 
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,11 +32,13 @@ class PhotoStoryLinkerPluginTest {
     @Test
     void contextLoads() {
         when(schemeManager.get(PhotoStoryBinding.class)).thenReturn(scheme);
+        when(schemeManager.get(JournalEntry.class)).thenReturn(scheme);
 
         plugin.start();
         plugin.stop();
 
         verify(schemeManager).register(eq(PhotoStoryBinding.class));
-        verify(schemeManager).unregister(eq(scheme));
+        verify(schemeManager).register(eq(JournalEntry.class));
+        verify(schemeManager, times(2)).unregister(eq(scheme));
     }
 }

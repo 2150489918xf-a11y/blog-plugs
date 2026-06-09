@@ -6,17 +6,18 @@ export default definePlugin({
   components: {},
   routes: [
     {
-      parentName: 'ToolsRoot',
+      parentName: 'Root',
       route: {
-        path: 'photo-story-linker',
+        path: '/photo-story-linker',
         name: 'PhotoStoryLinker',
         component: () => import('./views/HomeView.vue'),
         meta: {
-          title: 'Photo Stories',
+          title: '日记故事',
           searchable: true,
           permissions: ['plugin:photo-story-linker:manage'],
           menu: {
-            name: 'Photo Stories',
+            name: '日记故事',
+            group: 'content',
             icon: markRaw(IconImageAddLine),
             priority: 20,
           },

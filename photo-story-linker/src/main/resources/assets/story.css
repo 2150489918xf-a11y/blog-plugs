@@ -1,15 +1,28 @@
 .photo-story-linked {
   position: relative;
+  isolation: isolate;
 }
 
 .photo-story-linked .photo-story-native-hidden {
-  opacity: 0;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.photo-story-linked > figcaption,
+.photo-story-linked:hover > figcaption,
+.photo-story-linked:focus-within > figcaption {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .photo-story-linked .photo-story-overlay {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 10;
   display: flex;
   align-items: flex-end;
   padding: 1rem;
