@@ -1,0 +1,95 @@
+apiVersion: v1alpha1
+kind: Setting
+metadata:
+  name: notion-photo-stories-settings
+spec:
+  forms:
+    - group: notion
+      label: Notion 连接
+      formSchema:
+        - $formkit: password
+          name: notionToken
+          label: Notion Integration Token
+          validation: required
+          help: 只在服务端使用，不会输出到页面。
+        - $formkit: text
+          name: databaseId
+          label: Notion 数据库 ID
+          value: 37bbedc8681180199bbce653a8bf2325
+          validation: required
+        - $formkit: text
+          name: pageTitle
+          label: 页面标题
+          value: 图片故事
+          validation: required
+        - $formkit: number
+          name: cacheTtlMinutes
+          label: 缓存时间（分钟）
+          value: 10
+          min: 1
+          max: 1440
+    - group: fields
+      label: 字段映射
+      formSchema:
+        - $formkit: text
+          name: titleProperty
+          label: 标题字段
+          value: 标题
+          validation: required
+        - $formkit: text
+          name: slugProperty
+          label: Slug 字段
+          value: Slug
+          validation: required
+        - $formkit: text
+          name: dateProperty
+          label: 日期字段
+          value: 日期
+        - $formkit: text
+          name: publishedProperty
+          label: 发布字段
+          value: 状态
+        - $formkit: select
+          name: publishedPropertyType
+          label: 发布字段类型
+          value: checkbox
+          options:
+            - label: Checkbox
+              value: checkbox
+            - label: Status
+              value: status
+            - label: Select
+              value: select
+        - $formkit: text
+          name: publishedValue
+          label: 发布状态值
+          value: 公开
+          help: 仅当发布字段类型是 Status 或 Select 时使用。
+        - $formkit: text
+          name: summaryProperty
+          label: 摘要字段
+          value: 摘要
+        - $formkit: text
+          name: tagsProperty
+          label: 标签字段
+          value: 标签
+        - $formkit: text
+          name: coverProperty
+          label: 封面图字段
+          value: 封面图
+          help: 可留空；留空时会读取 Notion 页面封面。
+    - group: privacy
+      label: 权限过滤
+      formSchema:
+        - $formkit: checkbox
+          name: filterPermission
+          label: 只展示权限为公开的内容
+          value: false
+        - $formkit: text
+          name: permissionProperty
+          label: 权限字段
+          value: 权限
+        - $formkit: text
+          name: publicPermissionValue
+          label: 公开值
+          value: 公开

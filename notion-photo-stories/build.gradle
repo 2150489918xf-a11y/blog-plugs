@@ -1,0 +1,58 @@
+plugins {
+    id 'java'
+    id "run.halo.plugin.devtools" version "0.6.2"
+}
+
+group 'me.xiongfan.halo.notionstories'
+version '0.1.0-SNAPSHOT'
+
+repositories {
+    maven {
+        name = 'Central Portal Snapshots'
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
+        content {
+            includeGroupAndSubgroups('run.halo')
+        }
+    }
+    mavenCentral()
+}
+
+dependencies {
+    implementation platform('run.halo.tools.platform:plugin:2.24.0')
+    compileOnly 'run.halo.app:api'
+
+    testImplementation 'run.halo.app:api'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of((findProperty('javaToolchainVersion') ?: '21') as Integer)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.named('generatePluginComponentsIdx') {
+    notCompatibleWithConfigurationCache('This task invokes "Task.project" at execution time, which is not supported with configuration cache.')
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes(
+            'Plugin-Main-Class': 'me.xiongfan.halo.notionstories.NotionPhotoStoriesPlugin'
+        )
+    }
+}
+
+halo {
+    version = '2.24'
+}

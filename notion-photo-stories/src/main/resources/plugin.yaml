@@ -1,0 +1,20 @@
+apiVersion: plugin.halo.run/v1alpha1
+kind: Plugin
+metadata:
+  name: notion-photo-stories
+spec:
+  enabled: true
+  requires: ">=2.23.0"
+  author:
+    name: xiongfan
+    website: https://xiongfan.me
+  settingName: notion-photo-stories-settings
+  configMapName: notion-photo-stories-config
+  homepage: https://github.com/2150489918xf-a11y/blog-plugs
+  repo: https://github.com/2150489918xf-a11y/blog-plugs
+  issues: https://github.com/2150489918xf-a11y/blog-plugs/issues
+  displayName: "Notion 图片故事"
+  version: "0.1.0-SNAPSHOT"
+  description: "从 Notion 数据库读取图片故事，并在 Halo 站点中生成公开列表页和详情页。"
+  license:
+    - name: "MIT"
