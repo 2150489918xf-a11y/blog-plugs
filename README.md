@@ -14,4 +14,8 @@ The blog theme is based on [L33Z22L11/blog-v3](https://github.com/L33Z22L11/blog
 - [photo-story-linker](./photo-story-linker): Halo plugin that binds gallery photos to story posts and enhances gallery previews.
 - [notion-photo-stories](./notion-photo-stories): Halo plugin that renders public photo story pages from a Notion database.
 
-Each plugin is kept in its own directory so this repository can hold more blog-related plugins later.
+## Services
+
+- [notion-stories-service](./notion-stories-service): Lightweight Next.js service for rendering Notion photo stories with react-notion-x.
+
+Each plugin or service is kept in its own directory so this repository can hold more blog-related projects later.

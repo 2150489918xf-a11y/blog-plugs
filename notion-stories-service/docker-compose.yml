@@ -1,0 +1,10 @@
+services:
+  notion-stories:
+    build:
+      context: .
+    container_name: notion-stories
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3010:3010"

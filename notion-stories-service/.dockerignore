@@ -1,0 +1,10 @@
+.env
+.env*.local
+.git
+.next
+node_modules
+next-start.log
+*.log
+Dockerfile
+docker-compose.yml
+README.md
